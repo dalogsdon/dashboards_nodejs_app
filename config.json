@@ -59,6 +59,15 @@
     DB_CELL_MARGIN: 10
     // Number of pixels in each row
     DB_DEFAULT_CELL_HEIGHT: 20
-    //Number of dashboard grid columns
+    // Number of dashboard grid columns
     DB_MAX_COLUMNS: 12
+
+    ///////////////////////////
+    // Dashboard Discovery blog
+    ///////////////////////////
+
+    DISCOVERY_URL: http://192.168.99.100:8080
+    DISCOVERY_POST_ENDPOINT: /wp-json/wp/v2/posts
+    DISCOVERY_BASIC_AUTH: "Basic YWRtaW46YWRtaW4="
+    PUBLISH_PLATFORM: "wordpress"
 }

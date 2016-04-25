@@ -9,13 +9,17 @@ var extract = require('extract-zip');
 var fs = require('fs-extra');
 var path = require('path');
 var Promise = require('es6-promise').Promise;
+var request = require('request');
 var tmp = require('tmp');
+var urljoin = require('url-join');
 
 var DB_EXT = config.get('DB_FILE_EXT');
 var DATA_DIR = config.get('NOTEBOOKS_DIR');
 var INDEX_NB_NAME = config.get('DB_INDEX');
 var ZIP_EXT = '.zip';
 debug('store dir: ' + DATA_DIR);
+
+var PUBLISH_URL = urljoin(config.get('DISCOVERY_URL'), config.get('DISCOVERY_POST_ENDPOINT'));
 
 var allowedUploadExts = [ DB_EXT, ZIP_EXT ];
 
@@ -117,7 +121,7 @@ function _loadNb(nbpath, stats) {
                             var nb = JSON.parse(rawData);
                             // cache notebook for future reads -- use given `nbpath` since that
                             // is path from request. later calls will look up using request path.
-                            store[nbpath] = nb; 
+                            store[nbpath] = nb;
                             resolve(nb);
                         } catch(e) {
                             reject(new Error('Error parsing notebook JSON'));
@@ -186,9 +190,58 @@ function _fileFilter (filename) {
     return allowedUploadExts.indexOf(ext) !== -1;
 }
 
+function _getPublishMetadata(nbAbsPath) {
+    return new Promise(function(resolve, reject) {
+        fs.stat(nbAbsPath, function(err, stats) {
+            if (err) {
+                resolve(null);
+            } else {
+                fs.readFile(nbAbsPath, 'utf8', function(err, rawData) {
+                    if (err) {
+                        resolve(null);
+                    } else {
+                        try {
+                            var nb = JSON.parse(rawData);
+                            if (nb.metadata &&
+                                nb.metadata.urth &&
+                                nb.metadata.urth.publish) {
+                                resolve(nb.metadata.urth.publish);
+                            } else {
+                                resolve(null);
+                            }
+                        } catch(e) {
+                            resolve(null);
+                        }
+                    }
+                });
+            }
+        });
+    });
+}
+
+function _updateBufferWithPublishMetadata(destination, filename, fileBuffer) {
+    return new Promise(function(resolve, reject) {
+        // check if publish metadata exists in existing version
+        var publishMetadata = _getPublishMetadata(path.join(destination, filename));
+        if (publishMetadata) {
+            try {
+                var nb = JSON.parse(fileBuffer.toString());
+                nb.metadata = nb.metadata || {};
+                nb.metadata.urth = nb.metadata.urth || {};
+                nb.metadata.urth.publish = publishMetadata;
+                resolve(new Buffer(JSON.stringify(nb)));
+            } catch(e) {
+                resolve(fileBuffer);
+            }
+        } else {
+            resolve(fileBuffer);
+        }
+    });
+}
+
 /**
  * Write file contents to specified location
- * 
+ *
  * @param  {String} destination - directory path which will contain uploaded dashboard
  * @param  {String} filename    - name of dashboard
  * @param  {Buffer} buffer      - contents of uploaded file
@@ -216,7 +269,7 @@ function _writeFile (destination, filename, buffer) {
 
 /**
  * Write zip archive contents to specified location
- * 
+ *
  * @param  {String} destination - directory path which will contain uploaded dashboard
  * @param  {String} filename    - name of dashboard
  * @param  {Buffer} buffer      - contents of uploaded zip archive
@@ -309,8 +362,10 @@ function upload(req, res, next) {
         limits: _uploadLimits
     });
 
-    // handle file upload
     var uploadPromise = null;
+    var publishPromise = null;
+
+    // handle file upload
     busboy.on('file', function(fieldname, file, originalname, encoding, mimetype) {
         if (++fileCount > 1) {
             // too many files, error
@@ -333,7 +388,11 @@ function upload(req, res, next) {
                         // write the file correctly
                         var extension = path.extname(originalname);
                         if (extension === DB_EXT) {
-                            promise = _writeFile(destination, _appendExt(filename), totalFile);
+                            filename = _appendExt(filename);
+                            promise = _updateBufferWithPublishMetadata(destination, filename, totalFile)
+                                .then(function success(updatedFile) {
+                                    return _writeFile(destination, filename, updatedFile);
+                                });
                         } else if (extension === '.zip') {
                             promise = _writeZipFile(destination, filename, totalFile);
                         }
@@ -353,6 +412,19 @@ function upload(req, res, next) {
         }
     });
 
+    busboy.on('publish', function(value) {
+        publishPromise = new Promise(function(resolve, reject) {
+            uploadPromise.then(
+                function success() {
+
+                },
+                function failure(err) {
+
+                }
+            );
+        });
+    });
+
     // finish processing form
     busboy.on('finish', function() {
         debug('Finished reading form data');
@@ -362,7 +434,16 @@ function upload(req, res, next) {
                 function success() {
                     // bust the notebook cache so it can load the new file
                     remove(cachedPath);
-                    next();
+
+                    // publish as a post to the discovery blog
+                    publishPost(req, cachedPath).then(
+                        function success() {
+                            next();
+                        },
+                        function failure(err) {
+                            next(err);
+                        }
+                    );
                 },
                 function failure(err) {
                     next(err);
@@ -376,6 +457,37 @@ function upload(req, res, next) {
 
     // start the form processing
     req.pipe(busboy);
+}
+
+function publishPost(req, nbPath) {
+    var getUrl = req.protocol + '://' + req.hostname + ':' + config.get('PORT') + '/dashboards';
+    var iframeUrl = urljoin(getUrl, nbPath);
+    request({
+        url: PUBLISH_URL,
+        method: 'POST',
+        headers: {
+            Authorization: config.get('DISCOVERY_BASIC_AUTH'),
+            'Content-Type': 'application/json',
+            Accept: 'application/json'
+        },
+        body: JSON.stringify({
+            content: {
+                raw: "[iframe src='"+iframeUrl+"']"
+            },
+            title: {
+                raw: "Uploaded dashboard: " + nbPath
+            },
+            author: 1,
+            excerpt: {
+                raw: ""
+            },
+            status: "publish"
+        })
+    }, function(err, response) {
+        if (err) {
+            console.error(err);
+        }
+    });
 }
 
 module.exports = {
