@@ -22,7 +22,7 @@
     // Optional HTTPS certificate
     HTTPS_CERT_FILE: null
     // Directory that contains notebooks to serve as dashboards relative to
-    // the current working directory. Defaults to <package-dir>/data if left 
+    // the current working directory. Defaults to <package-dir>/data if left
     // unset.
     NOTEBOOKS_DIR: ""
     // Secret for authentication tokens
@@ -69,5 +69,5 @@
     DISCOVERY_URL: http://192.168.99.100:8080
     DISCOVERY_POST_ENDPOINT: /wp-json/wp/v2/posts
     DISCOVERY_BASIC_AUTH: "Basic YWRtaW46YWRtaW4="
-    PUBLISH_PLATFORM: "wordpress"
+    PUBLISH_PLATFORM: "publish-wordpress"
 }

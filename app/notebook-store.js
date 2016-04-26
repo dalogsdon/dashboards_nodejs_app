@@ -462,31 +462,35 @@ function upload(req, res, next) {
 function publishPost(req, nbPath) {
     var getUrl = req.protocol + '://' + req.hostname + ':' + config.get('PORT') + '/dashboards';
     var iframeUrl = urljoin(getUrl, nbPath);
-    request({
-        url: PUBLISH_URL,
-        method: 'POST',
-        headers: {
-            Authorization: config.get('DISCOVERY_BASIC_AUTH'),
-            'Content-Type': 'application/json',
-            Accept: 'application/json'
-        },
-        body: JSON.stringify({
-            content: {
-                raw: "[iframe src='"+iframeUrl+"']"
+    return new Promise(function(resolve, reject) {
+        request({
+            url: PUBLISH_URL,
+            method: 'POST',
+            headers: {
+                Authorization: config.get('DISCOVERY_BASIC_AUTH'),
+                'Content-Type': 'application/json',
+                Accept: 'application/json'
             },
-            title: {
-                raw: "Uploaded dashboard: " + nbPath
-            },
-            author: 1,
-            excerpt: {
-                raw: ""
-            },
-            status: "publish"
-        })
-    }, function(err, response) {
-        if (err) {
-            console.error(err);
-        }
+            body: JSON.stringify({
+                content: {
+                    raw: "[iframe src='"+iframeUrl+"']"
+                },
+                title: {
+                    raw: "Uploaded dashboard: " + nbPath
+                },
+                author: 1,
+                excerpt: {
+                    raw: ""
+                },
+                status: "publish"
+            })
+        }, function(err, response) {
+            if (err) {
+                reject(err);
+            } else {
+                resolve();
+            }
+        });
     });
 }
 
