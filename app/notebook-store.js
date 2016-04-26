@@ -9,17 +9,17 @@ var extract = require('extract-zip');
 var fs = require('fs-extra');
 var path = require('path');
 var Promise = require('es6-promise').Promise;
-var request = require('request');
 var tmp = require('tmp');
 var urljoin = require('url-join');
+var publishModule = config.get('PUBLISH_MODULE') ? require('./' + config.get('PUBLISH_MODULE')) : null;
 
 var DB_EXT = config.get('DB_FILE_EXT');
 var DATA_DIR = config.get('NOTEBOOKS_DIR');
 var INDEX_NB_NAME = config.get('DB_INDEX');
 var ZIP_EXT = '.zip';
-debug('store dir: ' + DATA_DIR);
+var PUBLISH_PLATFORM = config.get('PUBLISH_PLATFORM');
 
-var PUBLISH_URL = urljoin(config.get('DISCOVERY_URL'), config.get('DISCOVERY_POST_ENDPOINT'));
+debug('store dir: ' + DATA_DIR);
 
 var allowedUploadExts = [ DB_EXT, ZIP_EXT ];
 
@@ -222,20 +222,48 @@ function _getPublishMetadata(nbAbsPath) {
 function _updateBufferWithPublishMetadata(destination, filename, fileBuffer) {
     return new Promise(function(resolve, reject) {
         // check if publish metadata exists in existing version
-        var publishMetadata = _getPublishMetadata(path.join(destination, filename));
-        if (publishMetadata) {
-            try {
-                var nb = JSON.parse(fileBuffer.toString());
-                nb.metadata = nb.metadata || {};
-                nb.metadata.urth = nb.metadata.urth || {};
-                nb.metadata.urth.publish = publishMetadata;
-                resolve(new Buffer(JSON.stringify(nb)));
-            } catch(e) {
+        _getPublishMetadata(path.join(destination, filename)).then(function(publishMetadata) {
+            if (publishMetadata) {
+                try {
+                    var nb = JSON.parse(fileBuffer.toString());
+                    nb.metadata = nb.metadata || {};
+                    nb.metadata.urth = nb.metadata.urth || {};
+                    nb.metadata.urth.publish = publishMetadata;
+                    resolve(new Buffer(JSON.stringify(nb)));
+                } catch(e) {
+                    resolve(fileBuffer);
+                }
+            } else {
                 resolve(fileBuffer);
             }
-        } else {
-            resolve(fileBuffer);
-        }
+        });
+    });
+}
+
+function _savePostId(destination, filename, post_id) {
+    
+}
+
+function _publishDashboard(destination, filename, nbpath) {
+    return new Promise(function(resolve, reject) {
+        // check if publish metadata exists in existing version
+        _getPublishMetadata(path.join(destination, filename)).then(function(publishMetadata) {
+            var promise;
+            if (publishMetadata && 
+                publishMetadata.PUBLISH_PLATFORM && 
+                publishMetadata.PUBLISH_PLATFORM.hasOwnProperty('post_id')) {
+                promise = publishModule.update(nbpath, publishMetadata.PUBLISH_PLATFORM.post_id);
+            } else {
+                promise = publishModule.create(nbpath).then(function(post_id){
+                    return _savePostId(destination, filename, post_id);
+                });
+            }
+            promise.then(function() {
+                resolve();
+            }, function(err) {
+                reject(err);
+            });
+        });
     });
 }
 
@@ -343,7 +371,7 @@ function _writeZipFile(destination, filename, buffer) {
 // send a descriptive error message when too many files are sent, lets set the
 // file limit to 2 and return an error if 2 files are sent.
 var _uploadLimits = {
-    fields: 0,
+    fields: 1,
     files: 2,
     parts: 2
 };
@@ -363,7 +391,7 @@ function upload(req, res, next) {
     });
 
     var uploadPromise = null;
-    var publishPromise = null;
+    var willPublish = false;
 
     // handle file upload
     busboy.on('file', function(fieldname, file, originalname, encoding, mimetype) {
@@ -412,17 +440,10 @@ function upload(req, res, next) {
         }
     });
 
-    busboy.on('publish', function(value) {
-        publishPromise = new Promise(function(resolve, reject) {
-            uploadPromise.then(
-                function success() {
-
-                },
-                function failure(err) {
-
-                }
-            );
-        });
+    busboy.on('field', function(fieldname, val, fieldnameTruncated, valTruncated, encoding, mimetype) {
+        if (fieldname === "publish") {
+            willPublish = val === "true";
+        }
     });
 
     // finish processing form
@@ -436,14 +457,18 @@ function upload(req, res, next) {
                     remove(cachedPath);
 
                     // publish as a post to the discovery blog
-                    publishPost(req, cachedPath).then(
-                        function success() {
-                            next();
-                        },
-                        function failure(err) {
-                            next(err);
-                        }
-                    );
+                    if (willPublish && publishModule) {
+                        _publishDashboard(destination, filename, cachedPath).then(
+                            function success() {
+                                next();
+                            },
+                            function failure(err) {
+                                next(err);
+                            }
+                        );
+                    } else {
+                        next();
+                    }
                 },
                 function failure(err) {
                     next(err);
@@ -457,41 +482,6 @@ function upload(req, res, next) {
 
     // start the form processing
     req.pipe(busboy);
-}
-
-function publishPost(req, nbPath) {
-    var getUrl = req.protocol + '://' + req.hostname + ':' + config.get('PORT') + '/dashboards';
-    var iframeUrl = urljoin(getUrl, nbPath);
-    return new Promise(function(resolve, reject) {
-        request({
-            url: PUBLISH_URL,
-            method: 'POST',
-            headers: {
-                Authorization: config.get('DISCOVERY_BASIC_AUTH'),
-                'Content-Type': 'application/json',
-                Accept: 'application/json'
-            },
-            body: JSON.stringify({
-                content: {
-                    raw: "[iframe src='"+iframeUrl+"']"
-                },
-                title: {
-                    raw: "Uploaded dashboard: " + nbPath
-                },
-                author: 1,
-                excerpt: {
-                    raw: ""
-                },
-                status: "publish"
-            })
-        }, function(err, response) {
-            if (err) {
-                reject(err);
-            } else {
-                resolve();
-            }
-        });
-    });
 }
 
 module.exports = {

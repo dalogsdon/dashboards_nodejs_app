@@ -71,4 +71,8 @@ if (key_file_location || cert_file_location) {
     });
 }
 
+if (config.get('PUBLISH_PLATFORM')) {
+    config.set('PUBLISH_MODULE', 'publish-' + config.get('PUBLISH_PLATFORM'));
+}
+
 module.exports = config;
