@@ -9,19 +9,19 @@ var extract = require('extract-zip');
 var fs = require('fs-extra');
 var path = require('path');
 var Promise = require('es6-promise').Promise;
+var publish = require('./publish');
 var tmp = require('tmp');
-var urljoin = require('url-join');
-var publishModule = config.get('PUBLISH_MODULE') ? require('./' + config.get('PUBLISH_MODULE')) : null;
 
 var DB_EXT = config.get('DB_FILE_EXT');
 var DATA_DIR = config.get('NOTEBOOKS_DIR');
+var ENCODING = 'utf8';
 var INDEX_NB_NAME = config.get('DB_INDEX');
 var ZIP_EXT = '.zip';
 var PUBLISH_PLATFORM = config.get('PUBLISH_PLATFORM');
 
 debug('store dir: ' + DATA_DIR);
 
-var allowedUploadExts = [ DB_EXT, ZIP_EXT ];
+var ALLOWED_UPLOAD_EXTS = [ DB_EXT, ZIP_EXT ];
 
 // cached notebook objects
 var store = {};
@@ -30,10 +30,10 @@ var store = {};
 // GET OPERATIONS
 /////////////////
 
-// Append the notebook file extension if left off
-function _appendExt(nbpath) {
-    var ext = path.extname(nbpath) === DB_EXT ? '' : DB_EXT;
-    return nbpath + ext;
+// Appends the specified extension if left off
+// If extension is not specified, uses notebook file extension
+function _appendExt(nbpath, ext) {
+    return nbpath + (ext || (path.extname(nbpath) === DB_EXT ? '' : DB_EXT));
 }
 
 // determines if the specified file exists
@@ -113,7 +113,7 @@ function _loadNb(nbpath, stats) {
 
             return new Promise(function(resolve, reject) {
                 var nbAbsPath = path.join(DATA_DIR, nbfile);
-                fs.readFile(nbAbsPath, 'utf8', function(err, rawData) {
+                fs.readFile(nbAbsPath, ENCODING, function(err, rawData) {
                     if (err) {
                         reject(new Error('Error loading notebook: ' + err.message));
                     } else {
@@ -172,118 +172,27 @@ function remove(nbpath) {
 
 var _uploadMessage = 'Make sure to upload a single Jupyter Notebook file (*.ipynb).';
 
-/**
- * Return absolute destination directory
- * @param  {Request} req
- * @return {String}
- */
-function _getDestination (req) {
-    // parse destination directory from request url
-    var nbdir = path.dirname(req.params[0]);
-    var destDir = path.join(DATA_DIR, nbdir);
-    return destDir;
-}
-
 function _fileFilter (filename) {
     // check that file extension is in list of allowed upload file extensions
     var ext = path.extname(filename).toLowerCase();
-    return allowedUploadExts.indexOf(ext) !== -1;
-}
-
-function _getPublishMetadata(nbAbsPath) {
-    return new Promise(function(resolve, reject) {
-        fs.stat(nbAbsPath, function(err, stats) {
-            if (err) {
-                resolve(null);
-            } else {
-                fs.readFile(nbAbsPath, 'utf8', function(err, rawData) {
-                    if (err) {
-                        resolve(null);
-                    } else {
-                        try {
-                            var nb = JSON.parse(rawData);
-                            if (nb.metadata &&
-                                nb.metadata.urth &&
-                                nb.metadata.urth.publish) {
-                                resolve(nb.metadata.urth.publish);
-                            } else {
-                                resolve(null);
-                            }
-                        } catch(e) {
-                            resolve(null);
-                        }
-                    }
-                });
-            }
-        });
-    });
-}
-
-function _updateBufferWithPublishMetadata(destination, filename, fileBuffer) {
-    return new Promise(function(resolve, reject) {
-        // check if publish metadata exists in existing version
-        _getPublishMetadata(path.join(destination, filename)).then(function(publishMetadata) {
-            if (publishMetadata) {
-                try {
-                    var nb = JSON.parse(fileBuffer.toString());
-                    nb.metadata = nb.metadata || {};
-                    nb.metadata.urth = nb.metadata.urth || {};
-                    nb.metadata.urth.publish = publishMetadata;
-                    resolve(new Buffer(JSON.stringify(nb)));
-                } catch(e) {
-                    resolve(fileBuffer);
-                }
-            } else {
-                resolve(fileBuffer);
-            }
-        });
-    });
-}
-
-function _savePostId(destination, filename, post_id) {
-    
-}
-
-function _publishDashboard(destination, filename, nbpath) {
-    return new Promise(function(resolve, reject) {
-        // check if publish metadata exists in existing version
-        _getPublishMetadata(path.join(destination, filename)).then(function(publishMetadata) {
-            var promise;
-            if (publishMetadata && 
-                publishMetadata.PUBLISH_PLATFORM && 
-                publishMetadata.PUBLISH_PLATFORM.hasOwnProperty('post_id')) {
-                promise = publishModule.update(nbpath, publishMetadata.PUBLISH_PLATFORM.post_id);
-            } else {
-                promise = publishModule.create(nbpath).then(function(post_id){
-                    return _savePostId(destination, filename, post_id);
-                });
-            }
-            promise.then(function() {
-                resolve();
-            }, function(err) {
-                reject(err);
-            });
-        });
-    });
+    return ALLOWED_UPLOAD_EXTS.indexOf(ext) !== -1;
 }
 
 /**
  * Write file contents to specified location
  *
- * @param  {String} destination - directory path which will contain uploaded dashboard
- * @param  {String} filename    - name of dashboard
+ * @param  {String} destination - file path of uploaded dashboard
  * @param  {Buffer} buffer      - contents of uploaded file
  * @return {Promise}
  */
-function _writeFile (destination, filename, buffer) {
+function _writeFile (destination, buffer) {
     return new Promise(function(resolve, reject) {
-        fs.mkdir(destination, function(err) {
+        fs.mkdir(path.dirname(destination), function(err) {
             if (err && err.code !== 'EEXIST') {
                 reject(err);
             } else {
-                var destFilename = path.join(destination, filename);
-                debug('Uploading notebook: ' + destFilename);
-                fs.writeFile(destFilename, buffer, function(err) {
+                debug('Uploading notebook: ' + destination);
+                fs.writeFile(destination, buffer, function(err) {
                     if (err) {
                         reject(err);
                     } else {
@@ -298,12 +207,11 @@ function _writeFile (destination, filename, buffer) {
 /**
  * Write zip archive contents to specified location
  *
- * @param  {String} destination - directory path which will contain uploaded dashboard
- * @param  {String} filename    - name of dashboard
+ * @param  {String} destination - file path of uploaded dashboard
  * @param  {Buffer} buffer      - contents of uploaded zip archive
  * @return {Promise}
  */
-function _writeZipFile(destination, filename, buffer) {
+function _writeZipFile(destination, buffer) {
     // create a temporary directory in which to unzip archive
     return new Promise(function(resolve, reject) {
         tmp.dir({ unsafeCleanup: true }, function(err, tmpDir, cleanup) {
@@ -318,7 +226,7 @@ function _writeZipFile(destination, filename, buffer) {
     })
     .then(function(tempobj) {
         var tmpDir = tempobj.path;
-        var tmpZip = path.join(tmpDir, filename + ZIP_EXT);
+        var tmpZip = path.join(tmpDir, _appendExt(path.basename(destination), ZIP_EXT));
         var tmpUnzipDir = path.join(path.dirname(tmpZip), path.basename(tmpZip, ZIP_EXT));
 
         // write zip archive contents to filesystem
@@ -347,8 +255,7 @@ function _writeZipFile(destination, filename, buffer) {
         })
         // move unzipped contents to data directory, overwriting previously existing dir
         .then(function(tmpUnzipDir) {
-            var destDir = path.join(destination, filename);
-
+            var destDir = path.dirname(destination);
             return new Promise(function(resolve, reject) {
                 fs.move(tmpUnzipDir, destDir, { clobber: true }, function(err) {
                     if (err) {
@@ -379,8 +286,7 @@ var _uploadLimits = {
 function upload(req, res, next) {
     var buffers = [];
     var bufferLength = 0;
-    var destination = _getDestination(req);
-    var filename = path.basename(req.params[0]);
+    var destination = path.join(DATA_DIR, req.params[0]);
     var cachedPath = req.params[0];
     var fileCount = 0;
 
@@ -415,14 +321,14 @@ function upload(req, res, next) {
 
                         // write the file correctly
                         var extension = path.extname(originalname);
+                        destination = _appendExt(destination, extension);
                         if (extension === DB_EXT) {
-                            filename = _appendExt(filename);
-                            promise = _updateBufferWithPublishMetadata(destination, filename, totalFile)
+                            promise = publish.updateBufferWithPublishMetadata(destination, totalFile)
                                 .then(function success(updatedFile) {
-                                    return _writeFile(destination, filename, updatedFile);
+                                    return _writeFile(destination, updatedFile);
                                 });
                         } else if (extension === '.zip') {
-                            promise = _writeZipFile(destination, filename, totalFile);
+                            promise = _writeZipFile(destination, totalFile);
                         }
 
                         promise.then(resolve, function failure(err) {
@@ -457,8 +363,8 @@ function upload(req, res, next) {
                     remove(cachedPath);
 
                     // publish as a post to the discovery blog
-                    if (willPublish && publishModule) {
-                        _publishDashboard(destination, filename, cachedPath).then(
+                    if (willPublish && publish.hasPlatform) {
+                        publish.publishDashboard(_appendExt(destination), cachedPath).then(
                             function success() {
                                 next();
                             },

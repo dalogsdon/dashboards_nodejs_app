@@ -10,15 +10,25 @@ var request = require('request');
 var urljoin = require('url-join');
 var Promise = require('es6-promise').Promise;
 
+var publicIP = config.get('PUBLIC_IP') || config.get('IP');
+
 var _protocol = config.get('SSL_OPTIONS') ? 'https' : 'http';
-var IFRAME_BASEURL = _protocol + '://' + config.get('IP') + ':' + config.get('PORT') + '/dashboards';
+var IFRAME_BASEURL = _protocol + '://' + publicIP + ':' + config.get('PORT') + '/dashboards';
 var PUBLISH_URL = urljoin(config.get('DISCOVERY_URL'), config.get('DISCOVERY_POST_ENDPOINT'));
+
+function _isInteger(i) {
+    return Number(i) === parseInt(i, 10);
+}
 
 function publishPost(nbPath, postId) {
     var iframeUrl = urljoin(IFRAME_BASEURL, nbPath);
+    var publishUrl = PUBLISH_URL;
+    if (_isInteger(postId)) {
+        publishUrl = urljoin(publishUrl, postId);
+    }
     return new Promise(function(resolve, reject) {
         request({
-            url: PUBLISH_URL,
+            url: publishUrl,
             method: 'POST',
             headers: {
                 Authorization: config.get('DISCOVERY_BASIC_AUTH'),
@@ -53,10 +63,14 @@ function publishPost(nbPath, postId) {
 }
 
 module.exports = {
-    create: function(nbPath){
+    create: function(nbPath) {
     	return publishPost(nbPath);
     },
-    update: function(nbPath, id){
-    	return publishPost(nbPath, id);
+    update: function(nbPath, id) {
+        if (_isInteger(id)) {
+    	    return publishPost(nbPath, id);
+        } else {
+            throw new Error('Invalid id, must be integer');
+        }
     }
 };
