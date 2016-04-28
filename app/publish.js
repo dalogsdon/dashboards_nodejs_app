@@ -52,8 +52,10 @@ function _publishDashboard(nbFilePath, nbUrlPath) {
             publishMetadata[PUBLISH_PLATFORM].hasOwnProperty('post_id')) {
             promise = publishModule.update(nbUrlPath, publishMetadata[PUBLISH_PLATFORM].post_id);
         } else {
-            promise = publishModule.create(nbUrlPath).then(function(id) {
-                return _savePostId(nbFilePath, id);
+            promise = publishModule.create(nbUrlPath).then(function(post) {
+                return _savePostId(nbFilePath, post.id).then(function() {
+                    return Promise.resolve(post);
+                });
             });
         }
         return promise;

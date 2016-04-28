@@ -365,7 +365,8 @@ function upload(req, res, next) {
                     // publish as a post to the discovery blog
                     if (willPublish && publish.hasPlatform) {
                         publish.publishDashboard(_appendExt(destination), cachedPath).then(
-                            function success() {
+                            function success(post) {
+                                req.post = post;
                                 next();
                             },
                             function failure(err) {

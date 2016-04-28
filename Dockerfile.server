@@ -49,9 +49,6 @@ RUN npm run build
 # always expose server on all interfaces in a container
 ENV IP 0.0.0.0
 
-# public IP to access server
-ENV PUBLIC_IP 192.168.99.100
-
 # expose the default express http/https port (3000/3001) and the node debugger port (8080)
 EXPOSE 3000 3001 8080
 

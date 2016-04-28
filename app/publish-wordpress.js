@@ -10,10 +10,7 @@ var request = require('request');
 var urljoin = require('url-join');
 var Promise = require('es6-promise').Promise;
 
-var publicIP = config.get('PUBLIC_IP') || config.get('IP');
-
-var _protocol = config.get('SSL_OPTIONS') ? 'https' : 'http';
-var IFRAME_BASEURL = _protocol + '://' + publicIP + ':' + config.get('PORT') + '/dashboards';
+var IFRAME_BASEURL = urljoin(config.get('PUBLIC_LINK'), '/dashboards');
 var PUBLISH_URL = urljoin(config.get('DISCOVERY_URL'), config.get('DISCOVERY_POST_ENDPOINT'));
 
 function _isInteger(i) {
@@ -53,7 +50,11 @@ function publishPost(nbPath, postId) {
                 reject(err);
             } else {
                 try {
-                	resolve(JSON.parse(response.body).id);
+                    var body = JSON.parse(response.body);
+                	resolve({
+                        id: body.id,
+                        link: body.link
+                    });
                 } catch(e) {
                 	reject(e);
                 }
