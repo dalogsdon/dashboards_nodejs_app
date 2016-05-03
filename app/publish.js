@@ -14,7 +14,7 @@ var publishModule = config.get('PUBLISH_MODULE') ? require('./' + config.get('PU
 var ENCODING = 'utf8';
 var PUBLISH_PLATFORM = config.get('PUBLISH_PLATFORM');
 
-function _getPublishMetadata(nbFilePath) {
+function _getUrthMetadata(nbFilePath) {
     return new Promise(function(resolve, reject) {
         fs.stat(nbFilePath, function(err, stats) {
             if (err) {
@@ -26,10 +26,8 @@ function _getPublishMetadata(nbFilePath) {
                     } else {
                         try {
                             var nb = JSON.parse(rawData);
-                            if (nb.metadata &&
-                                nb.metadata.urth &&
-                                nb.metadata.urth.publish) {
-                                resolve(nb.metadata.urth.publish);
+                            if (nb.metadata && nb.metadata.urth) {
+                                resolve(nb.metadata.urth);
                             } else {
                                 resolve(null);
                             }
@@ -45,14 +43,19 @@ function _getPublishMetadata(nbFilePath) {
 
 function _publishDashboard(nbFilePath, nbUrlPath) {
     // check if publish metadata exists in existing version
-    return _getPublishMetadata(nbFilePath).then(function(publishMetadata) {
+    return _getUrthMetadata(nbFilePath).then(function(urthMetadata) {
+        var publishMetadata = urthMetadata && urthMetadata.publish;
+        var nbMetadata = {
+            dashboard: urthMetadata && urthMetadata.dashboard
+        };
         var promise;
         if (publishMetadata &&
             publishMetadata[PUBLISH_PLATFORM] &&
             publishMetadata[PUBLISH_PLATFORM].hasOwnProperty('post_id')) {
-            promise = publishModule.update(nbUrlPath, publishMetadata[PUBLISH_PLATFORM].post_id);
+            nbMetadata.post_id = publishMetadata[PUBLISH_PLATFORM].post_id;
+            promise = publishModule.update(nbUrlPath, nbMetadata);
         } else {
-            promise = publishModule.create(nbUrlPath).then(function(post) {
+            promise = publishModule.create(nbUrlPath, nbMetadata).then(function(post) {
                 return _savePostId(nbFilePath, post.id).then(function() {
                     return Promise.resolve(post);
                 });
@@ -91,7 +94,8 @@ function _savePostId(nbFilePath, post_id) {
 function _updateBufferWithPublishMetadata(nbFilePath, nbBuffer) {
     return new Promise(function(resolve, reject) {
         // check if publish metadata exists in existing version
-        _getPublishMetadata(nbFilePath).then(function(publishMetadata) {
+        _getUrthMetadata(nbFilePath).then(function(urthMetadata) {
+            var publishMetadata = urthMetadata && urthMetadata.publish;
             if (publishMetadata) {
                 try {
                     var nb = JSON.parse(nbBuffer.toString());

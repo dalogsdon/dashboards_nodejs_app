@@ -17,12 +17,22 @@ function _isInteger(i) {
     return Number(i) === parseInt(i, 10);
 }
 
-function publishPost(nbPath, postId) {
+function getContentHeight(nbMetadata) {
+	if (nbMetadata && nbMetadata.dashboard && nbMetadata.dashboard.container_height) {
+		return nbMetadata.dashboard.container_height;
+	} else {
+		return "500";
+	}
+}
+
+function publishPost(nbPath, nbMetadata) {
     var iframeUrl = urljoin(IFRAME_BASEURL, nbPath);
     var publishUrl = PUBLISH_URL;
+    var postId = nbMetadata && nbMetadata.post_id;
     if (_isInteger(postId)) {
         publishUrl = urljoin(publishUrl, postId);
     }
+    var postContent = '[iframe src="'+iframeUrl+'" scrolling="no" height="'+ getContentHeight(nbMetadata) + '"]';
     return new Promise(function(resolve, reject) {
         request({
             url: publishUrl,
@@ -34,7 +44,7 @@ function publishPost(nbPath, postId) {
             },
             body: JSON.stringify({
                 content: {
-                    raw: '[iframe src="'+iframeUrl+'"]'
+                    raw: postContent
                 },
                 title: {
                     raw: 'Uploaded dashboard: ' + nbPath
@@ -64,12 +74,13 @@ function publishPost(nbPath, postId) {
 }
 
 module.exports = {
-    create: function(nbPath) {
-    	return publishPost(nbPath);
+    create: function(nbPath, nbMetadata) {
+    	return publishPost(nbPath, nbMetadata);
     },
-    update: function(nbPath, id) {
+    update: function(nbPath, nbMetadata) {
+    	var id = nbMetadata && nbMetadata.post_id;
         if (_isInteger(id)) {
-    	    return publishPost(nbPath, id);
+    	    return publishPost(nbPath, nbMetadata);
         } else {
             throw new Error('Invalid id, must be integer');
         }
