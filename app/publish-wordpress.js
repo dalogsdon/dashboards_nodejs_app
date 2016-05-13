@@ -24,7 +24,8 @@ function _publishPost(nbpath) {
 
     return Promise.all([
         nbmetadata.getPublishMetadata(nbpath),
-        nbmetadata.getHeight(nbpath)
+        nbmetadata.getHeight(nbpath),
+        nbmetadata.getTitle(nbpath)
     ]).then(function(values) {
         var publishMetadata = values[0] || {};
         var height = values[1];
@@ -48,7 +49,7 @@ function _publishPost(nbpath) {
                         'height="' + height + '"]'
                     },
                     title: {
-                        raw: 'Uploaded dashboard: ' + nbpath
+                        raw: values[2]
                     },
                     author: 1,
                     excerpt: {

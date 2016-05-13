@@ -17,6 +17,13 @@ function _getHeight(nbpath) {
     });
 }
 
+function _getTitle(nbpath) {
+    return _getMetadata(nbpath).then(function(metadata) {
+        return (metadata && metadata.dashboard &&
+            metadata.dashboard.post_title) || nbpath;
+    });
+}
+
 function _getMetadata(nbpath) {
     return nbstore.get(nbpath).then(function(nb) {
         return nb.metadata && nb.metadata.urth;
@@ -82,6 +89,12 @@ module.exports = {
      * @returns {Promise} resolved with dashboard height in px (no units)
      */
     getHeight: _getHeight,
+    /**
+     * Returns the dashboard post title as specified in the notebook metadata
+     * @param {String} nbpath - data path of the notebook file
+     * @returns {Promise} resolved with dashboard post title
+     */
+    getTitle: _getTitle,
     /**
      * Returns the dashboard metadata for the specified notebook
      * @param {String} nbpath - data path of the notebook file
