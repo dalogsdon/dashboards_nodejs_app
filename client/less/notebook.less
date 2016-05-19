@@ -9,6 +9,12 @@
 
 @rendered_html_border_color: #333;
 
+#dashboard-container {
+    &.container {
+        padding: 15px;
+    }
+}
+
 .rendered_html {
     // For a 14px base font size this goes as:
     // font-size = 26, 22, 18, 14, 12, 12
@@ -62,6 +68,13 @@
     }
 }
 
+.text-cell.rendered_html {
+    overflow-x: auto;
+    overflow-y: hidden;
+
+    padding: 0.5em 0.5em 0.5em 0.4em;
+}
+
 .jp-OutputArea {
     pre {
         background-color: transparent;
@@ -82,10 +95,10 @@
     }
 }
 
-.dashboard-cell {
-    &.text-cell {
-        overflow-x: auto;
-        overflow-y: hidden;
+.jp-OutputArea.rendered_html {
+    img {
+        margin-left: 0;
+        margin-right: 0;
     }
 }
 

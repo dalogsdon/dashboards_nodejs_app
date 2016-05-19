@@ -40,7 +40,7 @@ function _loadNb(nbpath, stats) {
                         var nb = JSON.parse(rawData);
                         // cache notebook for future reads -- use given `nbpath` since that
                         // is path from request. later calls will look up using request path.
-                        _cache[nbpath] = { nb: nb, absPath: nbfile };
+                        _cache[nbpath] = nb;
                         resolve(nb);
                     }
                 });
@@ -68,7 +68,7 @@ function _list(dir) {
 
 function _get(nbpath, stats) {
     if (_cache.hasOwnProperty(nbpath)) {
-        return Promise.resolve(_cache[nbpath].nb, _cache[nbpath].absPath);
+        return Promise.resolve(_cache[nbpath]);
     } else {
         return _loadNb(nbpath, stats);
     }
@@ -106,13 +106,13 @@ module.exports = {
     /**
      * Loads, parses, and returns cells (minus code) of the notebook specified by nbpath
      * @param  {String} nbpath - path of the notebook to load
-     * @return {Promise} resolved with notebook JSON and notebook absolute path
+     * @return {Promise.<Object>} notebook data
      */
     get: _get,
     /**
      * Lists contents of the specified directory
      * @param {String} dir - optional sub-directory to Lists
-     * @return {Promise} resolved with list of contents
+     * @return {Promise.<string[]>} list of contents
      */
     list: _list,
     /**
@@ -124,7 +124,7 @@ module.exports = {
      * Updates the specified notebook file with the given data
      * @param {String} nbpath - path of the notebook to update
      * @param {Object} updatedNb - updated notebook data
-     * @return {Promise} resolved with absolute path to notebook
+     * @return {Promise.<string>} absolute path to notebook
      */
     update: _update
 };

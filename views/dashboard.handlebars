@@ -12,7 +12,7 @@
 
 <div id="outer-dashboard">
     {{! Might need to refactor this line to better handle author mode?}}
-    <div id="dashboard-container" class="invisible center-container"
+    <div id="dashboard-container" class="invisible container"
         data-dashboard-layout="{{dashboardLayout}}">
         {{#each notebook.cells}}
             {{#if (isVisible metadata)}}
@@ -39,6 +39,7 @@
     (function() {
         var db = window.jupyter_dashboard = window.jupyter_dashboard || {};
         var Config = db.Config = db.Config || {};
+        Config.kernelname = "{{notebook.metadata.kernelspec.name}}";
         // values from notebook metadata
         {{#each notebook.metadata.urth.dashboard}}
             Config.{{@key}} = "{{this}}";

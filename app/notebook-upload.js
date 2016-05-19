@@ -6,6 +6,7 @@ var appendExt = require('./append-ext');
 var Busboy = require('busboy');
 var config = require('./config');
 var debug = require('debug')('dashboard-proxy:upload-notebook');
+var error = require('debug')('dashboard-proxy:upload-notebook:error');
 var extract = require('extract-zip');
 var fs = require('fs-extra');
 var nbmetadata = require('./notebook-metadata');
@@ -13,6 +14,7 @@ var nbstore = require('./notebook-store');
 var path = require('path');
 var Promise = require('es6-promise').Promise;
 var publish = require('./publish');
+var rimraf = require('rimraf');
 var tmp = require('tmp');
 
 var DATA_DIR = config.get('NOTEBOOKS_DIR');
@@ -166,6 +168,40 @@ function _writeZipFile(destination, buffer) {
 }
 
 /**
+ * Cleanup previously existing dashboard. If uploading a notebook, remove any similarly named
+ * directory (bundled dashboard). If uploading a bundled dashboard, remove similarly named
+ * notebook file.
+ *
+ * @param  {String} destination     - directory of uploaded dashboard
+ * @param  {Boolean} destIsNotebook - whether uploaded dashboard is a notebook file (true) or a
+ *                                    bundled dashboard (false)
+ * @return {Promise}
+ */
+function _cleanPreviousDashboard(destination, destIsNotebook) {
+    return new Promise(function(resolve, reject) {
+        if (destIsNotebook) {
+            // destination is a notebook; ensure there isn't a directory by same name
+            rimraf(destination, { disableGlob: true }, function(err) {
+                if (err) {
+                    reject('Failed to remove existing bundled dashboard directory: ' + err.message);
+                    return;
+                }
+                resolve();
+            });
+        } else {
+            // destination is a bundled dashboard; ensure there isn't a notebook with same name
+            fs.unlink(appendExt(destination, DB_EXT), function(err) {
+                if (err && err.code !== 'ENOENT') { // ignore "file doesn't exist" errors
+                    reject('Failed to remove existing notebook: ' + err.message);
+                    return;
+                }
+                resolve();
+            });
+        }
+    });
+}
+
+/**
  * Middleware function to upload a notebook file
  * @param {Request}  req - HTTP request object
  * @param {Response} res - HTTP response object
@@ -191,7 +227,7 @@ module.exports = function (req, res, next) {
     busboy.on('file', function(fieldname, file, originalname, encoding, mimetype) {
         if (++fileCount > 1) {
             // too many files, error
-            uploadPromise = Promise.reject(new Error('Too many files. ' + _uploadMessage));
+            uploadPromise = Promise.reject('Too many files. ' + _uploadMessage);
             file.resume();
         } else {
             uploadPromise = new Promise(function(resolve, reject) {
@@ -208,22 +244,31 @@ module.exports = function (req, res, next) {
 
                         // write the file correctly
                         var extension = path.extname(originalname);
+                        var destIsNotebook = extension === DB_EXT;
                         var promise = Promise.reject('File not written');
-                        if (extension === DB_EXT) {
+                        if (destIsNotebook) {
                             promise = _writeFile(appendExt(destination, DB_EXT), totalFile);
                         } else if (extension === '.zip') {
                             promise = _writeZipFile(destination, totalFile);
                         }
-                        promise.then(resolve, function failure(err) {
-                            reject(new Error('Failed to upload file: ' + err.message));
-                        });
+
+                        promise.catch(function(err) {
+                            reject('Failed to upload file: ' + err.message);
+                        })
+                        .then(function() {
+                            _cleanPreviousDashboard(destination, destIsNotebook);
+                        })
+                        // upload has successfully finished, but failed to cleanup other
+                        // dashboard; just log an error
+                        .catch(error)
+                        .then(resolve);
                     });
                     file.on('error', function(err) {
                         reject(err);
                     });
                 } else {
                     file.resume();
-                    reject(new Error('Wrong file extension. ' + _uploadMessage));
+                    reject('Wrong file extension. ' + _uploadMessage);
                 }
             });
         }
