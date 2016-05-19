@@ -57,9 +57,6 @@ function _publishPost(nbpath) {
                         raw: values[2]
                     },
                     author: 1,
-                    excerpt: {
-                        raw: ''
-                    },
                     status: 'publish'
                 })
             }, function(err, response) {
