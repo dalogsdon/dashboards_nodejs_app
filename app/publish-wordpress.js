@@ -6,7 +6,9 @@
  * Example: Wordpress strategy for publishing uploaded dashboards
  */
 var config = require('./config');
+var escape = require('escape-html');
 var nbmetadata = require('./notebook-metadata');
+var nbtext = require('./notebook-text');
 var Promise = require('es6-promise').Promise;
 var request = require('request');
 var urljoin = require('url-join');
@@ -25,10 +27,17 @@ function _publishPost(nbpath) {
     return Promise.all([
         nbmetadata.getPublishMetadata(nbpath),
         nbmetadata.getHeight(nbpath),
-        nbmetadata.getTitle(nbpath)
+        nbmetadata.getTitle(nbpath),
+        nbtext(nbpath)
     ]).then(function(values) {
         var publishMetadata = values[0] || {};
         var height = values[1];
+
+        var content = '<!-- ' + escape(values[3]) + ' -->\n' +
+            '[iframe src="' + iframeUrl + '" ' +
+                'scrolling="no" ' +
+                'height="' + height + '"]';
+
         return new Promise(function(resolve, reject) {
             var postId = publishMetadata.post_id;
             var publishUrl = _isInteger(postId) ?
@@ -43,11 +52,7 @@ function _publishPost(nbpath) {
                     Accept: 'application/json'
                 },
                 body: JSON.stringify({
-                    content: {
-                        raw: '[iframe src="' + iframeUrl + '" ' +
-                        'scrolling="no" ' +
-                        'height="' + height + '"]'
-                    },
+                    content: content,
                     title: {
                         raw: values[2]
                     },
