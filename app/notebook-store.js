@@ -40,7 +40,7 @@ function _loadNb(nbpath, stats) {
                         var nb = JSON.parse(rawData);
                         // cache notebook for future reads -- use given `nbpath` since that
                         // is path from request. later calls will look up using request path.
-                        _cache[nbpath] = nb;
+                        _cache[nbpath] = { nb: nb, absPath: nbfile };
                         resolve(nb);
                     }
                 });
@@ -68,7 +68,7 @@ function _list(dir) {
 
 function _get(nbpath, stats) {
     if (_cache.hasOwnProperty(nbpath)) {
-        return Promise.resolve(_cache[nbpath]);
+        return Promise.resolve(_cache[nbpath].nb);
     } else {
         return _loadNb(nbpath, stats);
     }
