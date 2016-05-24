@@ -56,7 +56,15 @@
         {{#if supportsDeclWidgets}}
             Config.supportsDeclWidgets = true;
         {{/if}}
+
+        // Blog support
+        {{#if (config "DISCOVERY_URL")}}
+            Config.DISCOVERY_URL = "{{{config "DISCOVERY_URL"}}}";
+        {{/if}}
     })();
 </script>
 <script src="/components/require.js"></script>
 <script src="/components/dashboard.js"></script>
+{{#if (config "DISCOVERY_URL")}}
+<script src="/components/resize-iframe.js"></script>
+{{/if}}

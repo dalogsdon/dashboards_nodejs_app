@@ -35,7 +35,8 @@ var webpackStatsOptions = {
 // base configuration
 var webpackConfig = {
     entry: {
-        'dashboard': './client/js/dashboard.js'
+        'dashboard': './client/js/dashboard.js',
+        'resize-iframe': './client/js/resize-iframe.js'
     },
     module: {
         loaders: [

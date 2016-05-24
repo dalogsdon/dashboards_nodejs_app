@@ -32,11 +32,15 @@ function _publishPost(nbpath) {
     ]).then(function(values) {
         var publishMetadata = values[0] || {};
         var height = values[1];
+        var searchable = values[3];
 
-        var content = '<!-- ' + escape(values[3]) + ' -->\n' +
-            '[iframe src="' + iframeUrl + '" ' +
+        var content =
+            '<!-- ' + escape(searchable) + ' -->\n' +
+            '[iframe ' +
+                'data-type="dashboard" ' +
+                'src="' + iframeUrl + '" ' +
                 'scrolling="no" ' +
-                'height="' + height + '"]';
+            ']';
 
         return new Promise(function(resolve, reject) {
             var postId = publishMetadata.post_id;
