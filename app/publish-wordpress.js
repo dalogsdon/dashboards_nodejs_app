@@ -26,13 +26,16 @@ function _publishPost(nbpath) {
 
     return Promise.all([
         nbmetadata.getPublishMetadata(nbpath),
-        nbmetadata.getHeight(nbpath),
-        nbmetadata.getTitle(nbpath),
+        nbmetadata.getPostInfo(nbpath),
         nbtext(nbpath)
     ]).then(function(values) {
         var publishMetadata = values[0] || {};
-        var height = values[1];
-        var searchable = values[3];
+        var postMetadata = values[1] || {};
+        var title = postMetadata.title || nbpath;
+        var author = postMetadata.author || 1;
+        var excerpt = postMetadata.excerpt || "";
+        var tags = postMetadata.tags || "";
+        var searchable = values[2];
 
         var content =
             '<!-- ' + escape(searchable) + ' -->\n' +
@@ -58,10 +61,13 @@ function _publishPost(nbpath) {
                 body: JSON.stringify({
                     content: content,
                     title: {
-                        raw: values[2]
+                        raw: title
                     },
-                    author: 1,
-                    status: 'publish'
+                    author: author,
+                    status: 'publish',
+                    excerpt: {
+                        raw: excerpt
+                    }
                 })
             }, function(err, response) {
                 if (err) {

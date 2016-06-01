@@ -10,17 +10,25 @@ var nbstore = require('./notebook-store');
 
 var PUBLISH_PLATFORM = config.get('PUBLISH_PLATFORM');
 
-function _getHeight(nbpath) {
-    return _getMetadata(nbpath).then(function(metadata) {
-        return (metadata && metadata.dashboard &&
-            metadata.dashboard.container_height) || 500;
-    });
-}
+function _getPostInfo(nbpath) {
+    return nbstore.get(nbpath).then(function(nb) {
+        var source = [];
+        var post_info = {};
+        nb.cells.some(function(cell) {
+            if (cell.cell_type === 'markdown'
+                && cell.source[0] && cell.source[0].indexOf("'''") > -1) {
+                source = cell.source;
+                return true;
+            }
+        });
 
-function _getTitle(nbpath) {
-    return _getMetadata(nbpath).then(function(metadata) {
-        return (metadata && metadata.dashboard &&
-            metadata.dashboard.post_title) || nbpath;
+        source.forEach(function(line) {
+            if (line.indexOf(':') > 0) {
+                line = line.split(":");
+                post_info[line[0]] = line[1].trim();
+            }
+        });
+        return post_info;
     });
 }
 
@@ -84,18 +92,6 @@ module.exports = {
      */
     copyDashboardServerMetadata: _copyDashboardServerMetadata,
     /**
-     * Returns the dashboard height as specified in the notebook metadata
-     * @param {String} nbpath - data path of the notebook file
-     * @returns {Promise} resolved with dashboard height in px (no units)
-     */
-    getHeight: _getHeight,
-    /**
-     * Returns the dashboard post title as specified in the notebook metadata
-     * @param {String} nbpath - data path of the notebook file
-     * @returns {Promise} resolved with dashboard post title
-     */
-    getTitle: _getTitle,
-    /**
      * Returns the dashboard metadata for the specified notebook
      * @param {String} nbpath - data path of the notebook file
      * @returns {Promise} resolved with dashboard metadata
@@ -114,5 +110,7 @@ module.exports = {
      * @param {Object} publishMetadata - publish metadata to set
      * @returns {Promise} resolved with `nbstore.update`
      */
-    setPublishMetadata: _setPublishMetadata
+    setPublishMetadata: _setPublishMetadata,
+
+    getPostInfo: _getPostInfo
 };
