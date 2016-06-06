@@ -16,9 +16,67 @@ var urljoin = require('url-join');
 var IFRAME_BASEURL = urljoin(config.get('PUBLIC_LINK'), '/dashboards');
 var PUBLISH_URL = urljoin(config.get('DISCOVERY_URL'),
                           config.get('DISCOVERY_POST_ENDPOINT'));
+var URL_ENDPOINT = urljoin(config.get('DISCOVERY_URL'),
+                          config.get('DISCOVERY_ENDPOINT'));
 
 function _isInteger(i) {
     return Number(i) === parseInt(i, 10);
+}
+
+function _getExistingTags() {
+    return new Promise(function(resolve, reject) {
+        request({
+            url: URL_ENDPOINT + '/tags',
+            method: 'GET',
+            headers: {
+                Authorization: config.get('DISCOVERY_BASIC_AUTH'),
+                'Content-Type': 'application/json',
+                Accept: 'application/json'
+            }
+        }, function(err, response) {
+            if (err) {
+                reject(err);
+            } else {
+                var body = JSON.parse(response.body);
+                resolve(body);
+            }
+        });
+    });
+}
+
+function _getTagIdFromList(tag, tagList) {
+    var tag_id = -1;
+    tagList.some(function(tagObj) {
+        if (tagObj.name === tag) {
+            tag_id = tagObj.id;
+            return true;
+        }
+    });
+    return tag_id;
+}
+
+function _createNewTag(tagName) {
+    return new Promise(function(resolve, reject) {
+        request({
+            url: URL_ENDPOINT + '/tags',
+            method: 'POST',
+            headers: {
+                Authorization: config.get('DISCOVERY_BASIC_AUTH'),
+                'Content-Type': 'application/json',
+                Accept: 'application/json'
+            },
+            body: JSON.stringify({
+                name: tagName
+            })
+        }, function(err, response) {
+            if (err) {
+                reject(err);
+            } else {
+                var body = JSON.parse(response.body);
+                resolve(body.id);
+            }
+        });
+    });
 }
 
 function _publishPost(nbpath) {
@@ -45,42 +103,64 @@ function _publishPost(nbpath) {
                 'scrolling="no" ' +
             ']';
 
-        return new Promise(function(resolve, reject) {
-            var postId = publishMetadata.post_id;
-            var publishUrl = _isInteger(postId) ?
-                urljoin(PUBLISH_URL, postId) : PUBLISH_URL;
+        // Handle tags
+        var existing_tags = _getExistingTags();
+        var userTags_ids = []; // array of promises
+        var userTags = tags.split(",");
 
-            request({
-                url: publishUrl,
-                method: 'POST',
-                headers: {
-                    Authorization: config.get('DISCOVERY_BASIC_AUTH'),
-                    'Content-Type': 'application/json',
-                    Accept: 'application/json'
-                },
-                body: JSON.stringify({
-                    content: content,
-                    title: {
-                        raw: title
-                    },
-                    author: author,
-                    status: 'publish',
-                    excerpt: {
-                        raw: excerpt
-                    }
-                })
-            }, function(err, response) {
-                if (err) {
-                    reject(err);
-                } else {
-                    var body = JSON.parse(response.body);
-                    resolve({
-                        id: body.id,
-                        link: body.link
-                    });
+        return existing_tags.then(function(tagList) {
+            userTags.forEach(function(userTag) {
+                userTag = userTag.trim();
+                tag_id = _getTagIdFromList(userTag, tagList);
+                if (tag_id > -1) { // if userTag is already an existing tag, push its id 
+                    userTags_ids.push(new Promise(function(resolve, reject) {
+                        resolve(tag_id);
+                    }));
+                } else { // else, create a new tag and push its id
+                    userTags_ids.push(_createNewTag(userTag));
                 }
             });
-        });
+
+            return Promise.all(userTags_ids).then(function(tag_ids) {
+                return new Promise(function(resolve, reject) {
+                    var postId = publishMetadata.post_id;
+                    var publishUrl = _isInteger(postId) ?
+                        urljoin(PUBLISH_URL, postId) : PUBLISH_URL;
+
+                    request({
+                        url: publishUrl,
+                        method: 'POST',
+                        headers: {
+                            Authorization: config.get('DISCOVERY_BASIC_AUTH'),
+                            'Content-Type': 'application/json',
+                            Accept: 'application/json'
+                        },
+                        body: JSON.stringify({
+                            content: content,
+                            title: {
+                                raw: title
+                            },
+                            author: author,
+                            status: 'publish',
+                            excerpt: {
+                                raw: excerpt
+                            },
+                            tags: tag_ids
+                        })
+                    }, function(err, response) {
+                        if (err) {
+                            reject(err);
+                        } else {
+                            var body = JSON.parse(response.body);
+                            resolve({
+                                id: body.id,
+                                link: body.link
+                            });
+                        }
+                    });
+                });
+            });
+        });  
     });
 }
 

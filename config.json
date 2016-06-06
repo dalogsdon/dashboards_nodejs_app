@@ -75,6 +75,7 @@
     ///////////////////////////
 
     DISCOVERY_URL: http://192.168.99.100:8080
+    DISCOVERY_ENDPOINT: /wp-json/wp/v2
     DISCOVERY_POST_ENDPOINT: /wp-json/wp/v2/posts
     DISCOVERY_BASIC_AUTH: "Basic YWRtaW46YWRtaW4="
     PUBLISH_PLATFORM: "wordpress"
