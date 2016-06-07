@@ -14,10 +14,14 @@ var request = require('request');
 var urljoin = require('url-join');
 
 var IFRAME_BASEURL = urljoin(config.get('PUBLIC_LINK'), '/dashboards');
-var PUBLISH_URL = urljoin(config.get('DISCOVERY_URL'),
-                          config.get('DISCOVERY_POST_ENDPOINT'));
-var URL_ENDPOINT = urljoin(config.get('DISCOVERY_URL'),
-                          config.get('DISCOVERY_ENDPOINT'));
+var API_BASE = urljoin(config.get('PUBLISH_URL'),
+                          config.get('PUBLISH_API_BASE'));
+
+var REQ_HEADERS = {
+    Authorization: config.get('PUBLISH_BASIC_AUTH'),
+    'Content-Type': 'application/json',
+    Accept: 'application/json'
+};
 
 function _isInteger(i) {
     return Number(i) === parseInt(i, 10);
@@ -26,13 +30,9 @@ function _isInteger(i) {
 function _getExistingTags() {
     return new Promise(function(resolve, reject) {
         request({
-            url: URL_ENDPOINT + '/tags',
+            url: urljoin(API_BASE, '/tags'),
             method: 'GET',
-            headers: {
-                Authorization: config.get('DISCOVERY_BASIC_AUTH'),
-                'Content-Type': 'application/json',
-                Accept: 'application/json'
-            }
+            headers: REQ_HEADERS
         }, function(err, response) {
             if (err) {
                 reject(err);
@@ -58,16 +58,10 @@ function _getTagIdFromList(tag, tagList) {
 function _createNewTag(tagName) {
     return new Promise(function(resolve, reject) {
         request({
-            url: URL_ENDPOINT + '/tags',
+            url: urljoin(API_BASE, '/tags'),
             method: 'POST',
-            headers: {
-                Authorization: config.get('DISCOVERY_BASIC_AUTH'),
-                'Content-Type': 'application/json',
-                Accept: 'application/json'
-            },
-            body: JSON.stringify({
-                name: tagName
-            })
+            headers: REQ_HEADERS,
+            body: JSON.stringify({ name: tagName })
         }, function(err, response) {
             if (err) {
                 reject(err);
@@ -124,17 +118,14 @@ function _publishPost(nbpath) {
             return Promise.all(userTags_ids).then(function(tag_ids) {
                 return new Promise(function(resolve, reject) {
                     var postId = publishMetadata.post_id;
-                    var publishUrl = _isInteger(postId) ?
-                        urljoin(PUBLISH_URL, postId) : PUBLISH_URL;
+                    var publishUrl = urljoin(API_BASE, '/posts');
+                    publishUrl = _isInteger(postId) ?
+                        urljoin(publishUrl, postId) : publishUrl;
 
                     request({
                         url: publishUrl,
                         method: 'POST',
-                        headers: {
-                            Authorization: config.get('DISCOVERY_BASIC_AUTH'),
-                            'Content-Type': 'application/json',
-                            Accept: 'application/json'
-                        },
+                        headers: REQ_HEADERS,
                         body: JSON.stringify({
                             content: content,
                             title: {
