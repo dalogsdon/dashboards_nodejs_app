@@ -15,8 +15,8 @@ function _getPostInfo(nbpath) {
         var source = [];
         var post_info = {};
         nb.cells.some(function(cell) {
-            if (cell.cell_type === 'markdown'
-                && cell.source[0] && cell.source[0].indexOf("'''") > -1) {
+            if (cell.cell_type === 'markdown' &&
+                cell.source[0] && cell.source[0].indexOf("'''") > -1) {
                 source = cell.source;
                 return true;
             }
@@ -24,7 +24,7 @@ function _getPostInfo(nbpath) {
 
         source.forEach(function(line) {
             if (line.indexOf(':') > 0) {
-                line = line.split(":");
+                line = line.split(':');
                 post_info[line[0]] = line[1].trim();
             }
         });

@@ -70,9 +70,9 @@
     // Number of dashboard grid columns
     DB_MAX_COLUMNS: 12
 
-    ///////////////////////////
-    // Dashboard Discovery blog
-    ///////////////////////////
+    ///////////////////////
+    // Dashboard publishing
+    ///////////////////////
 
     PUBLISH_URL: http://192.168.99.100:8080
     PUBLISH_API_BASE: /wp-json/wp/v2
