@@ -58,13 +58,13 @@
         {{/if}}
 
         // Blog support
-        {{#if (config "DISCOVERY_URL")}}
-            Config.DISCOVERY_URL = "{{{config "DISCOVERY_URL"}}}";
+        {{#if (config "PUBLISH_URL")}}
+            Config.PUBLISH_URL = "{{{config "PUBLISH_URL"}}}";
         {{/if}}
     })();
 </script>
 <script src="/components/require.js"></script>
 <script src="/components/dashboard.js"></script>
-{{#if (config "DISCOVERY_URL")}}
+{{#if (config "PUBLISH_URL")}}
 <script src="/components/resize-iframe.js"></script>
 {{/if}}

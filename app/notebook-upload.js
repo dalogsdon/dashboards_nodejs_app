@@ -290,7 +290,7 @@ module.exports = function (req, res, next) {
                     // clear the notebook cache so it can load the new file
                     nbstore.uncache(cachedPath);
 
-                    // publish as a post to the discovery blog
+                    // publish dashboard
                     if (willPublish && publish.hasPlatform) {
                         publish.publishDashboard(cachedPath).then(
                             function success(post) {

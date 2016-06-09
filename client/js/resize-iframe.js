@@ -11,12 +11,12 @@ var $ = require('jquery');
     var sendHandle;
     var prevHeight;
 
-    function sendHeight() {
+    function sendHeight() { 
         var height = $('body').outerHeight();
         if (height !== prevHeight) {
             prevHeight = height;
             console.info('Sending document height to parent:', height);
-            window.parent.postMessage({ height: height }, Config.DISCOVERY_URL);
+            window.parent.postMessage({ height: height }, Config.PUBLISH_URL);
         }
     }
 
