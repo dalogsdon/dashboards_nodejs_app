@@ -13,10 +13,10 @@
 var $ = require('jquery');
 
     var Config = window.jupyter_dashboard.Config;
-    var cellMargin = Config.cellMargin;
+    var cellMargin = Number(Config.cellMargin);
     var halfMargin = cellMargin / 2;
-    var cellHeight = Config.defaultCellHeight;
-    var numColumns = Config.maxColumns;
+    var cellHeight = Number(Config.defaultCellHeight);
+    var numColumns = Number(Config.maxColumns);
     var visibleCells = $('.dashboard-cell:not(.hidden)');
     var maxY = visibleCells.map(function(i, cell) {
             return $(cell).attr('data-layout-row');
@@ -36,6 +36,11 @@ var $ = require('jquery');
             .attr('type', 'text/css');
         $('head').append(style);
         var sheet = style.get(0).sheet;
+
+        // set document height
+        $('body').css('height',
+            (maxY * cellHeight + maxY * cellMargin) +
+            (maxHeight * cellHeight + (maxHeight-1) * cellMargin) + 'px');
 
         // x-position
         var left;
