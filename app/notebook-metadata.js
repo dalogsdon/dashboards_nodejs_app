@@ -16,7 +16,7 @@ function _getPostInfo(nbpath) {
         var post_info = {};
         nb.cells.some(function(cell) {
             if (cell.cell_type === 'markdown' &&
-                cell.source[0] && cell.source[0].indexOf("'''") > -1) {
+                cell.source[0] && cell.source[0].indexOf("```") > -1) {
                 source = cell.source;
                 return true;
             }
