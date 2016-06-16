@@ -38,9 +38,14 @@ var $ = require('jquery');
         var sheet = style.get(0).sheet;
 
         // set document height
+        var bottomCellHeight = visibleCells.map(function(cell) {
+            return Number($(cell).attr('data-layout-row'));
+        }).filter(function(y) {
+            return y === maxY;
+        });
         $('body').css('height',
             (maxY * cellHeight + maxY * cellMargin) +
-            (maxHeight * cellHeight + (maxHeight-1) * cellMargin) + 'px');
+            (bottomCellHeight * cellHeight + (bottomCellHeight-1) * cellMargin) + 'px');
 
         // x-position
         var left;
