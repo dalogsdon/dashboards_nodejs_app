@@ -17,15 +17,15 @@ var $ = require('jquery');
     var halfMargin = cellMargin / 2;
     var cellHeight = Number(Config.defaultCellHeight);
     var numColumns = Number(Config.maxColumns);
-    var visibleCells = $('.dashboard-cell:not(.hidden)');
-    var maxY = visibleCells.map(function(i, cell) {
+    var visibleCells = $('.dashboard-cell:not(.dashboard-hidden)').toArray();
+    var maxY = visibleCells.map(function(cell) {
             return $(cell).attr('data-layout-row');
-        }).get().reduce(function(a, b) {
+        }).reduce(function(a, b) {
             return Math.max(a, b);
         }, 0);
-    var maxHeight = visibleCells.map(function(i, cell) {
+    var maxHeight = visibleCells.map(function(cell) {
             return $(cell).attr('data-layout-height');
-        }).get().reduce(function(a, b) {
+        }).reduce(function(a, b) {
             return Math.max(a, b);
         }, 0);
 
@@ -38,11 +38,11 @@ var $ = require('jquery');
         var sheet = style.get(0).sheet;
 
         // set document height
-        var bottomCellHeight = visibleCells.map(function(cell) {
-            return Number($(cell).attr('data-layout-row'));
-        }).filter(function(y) {
-            return y === maxY;
-        });
+        var bottomCellHeight = visibleCells.filter(function(cell) {
+                return Number($(cell).attr('data-layout-row')) === maxY;
+            }).map(function(cell) {
+                return Number($(cell).attr('data-layout-height'));
+            })[0];
         $('body').css('height',
             (maxY * cellHeight + maxY * cellMargin) +
             (bottomCellHeight * cellHeight + (bottomCellHeight-1) * cellMargin) + 'px');
